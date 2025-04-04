@@ -1,5 +1,6 @@
 #include "cc1101.h"
-
+#include "hardware/spi.h"
+#include <stdlib.h>
 
 // Binary configuration for writing to cc1101 registers
 #define WRITE_SINGLE 0b00111111
@@ -23,28 +24,28 @@
 #define PARTNUM_ADDR 0x30
 #define VERSION_ADDR 0x31
 
-// Keeps track of how many CC1101s have been initialized so that 
+// SPI baudrate
+#define SPI_BAUDRATE 6250000
+
+// Keeps track of how many cc1101s have been initialized so that 
 // each one will have a unique spi interface
 static int cc1101_number = 0;
 
-CC1101 *cc1101_init(char sck, char tx, char rx, char cs) {
+cc1101_t *cc1101_init(int sck, int tx, int rx, int cs) {
 
-    CC1101 *cc1101 = malloc(sizeof(CC1101));
-    if (cc1101_number == 0) {
-        cc1101->spi_bus = spi0;
-        cc1101_number = 1;
-    } else if (cc1101_number == 1) {
-        cc1101->spi_bus = spi1;
-        cc1101_number = 2;
+    cc1101_t *cc1101 = malloc(sizeof(cc1101_t));
+    // Check if spi0 has already been initialized
+    if (spi_get_baudrate(spi0) == SPI_BAUDRATE) {
+        cc1101->spi_if = spi1;
     } else {
-        return NULL;
+        cc1101->spi_if = spi0;
     }
 
-    spi_init(cc1101->spi_bus, 6250000);
+    spi_init(cc1101->spi_if, SPI_BAUDRATE);
     
     // SPI interface, 8 data bits per transfer, CPOL
     // polarity and CPHA phase both 0, must be SPI_MSB_FIRST
-    spi_set_format(cc1101->spi_bus, 8, 0, 0, SPI_MSB_FIRST);
+    spi_set_format(cc1101->spi_if, 8, 0, 0, SPI_MSB_FIRST);
 
     // Initialize the other SPI pins
     gpio_set_function(sck, GPIO_FUNC_SPI);
@@ -72,7 +73,7 @@ CC1101 *cc1101_init(char sck, char tx, char rx, char cs) {
 }
 
 
-void write_reg(CC1101 *cc1101, uint8_t reg_addr, uint8_t *data) {
+void write_reg(cc1101_t *cc1101, uint8_t reg_addr, uint8_t *data) {
 
     // Combine register address, write bit, and burst bit to form header byte
     uint8_t header_byte = reg_addr | WRITE_SINGLE;
@@ -88,7 +89,7 @@ void write_reg(CC1101 *cc1101, uint8_t reg_addr, uint8_t *data) {
 }
 
 
-void write_burst_reg(CC1101 *cc1101, uint8_t start_reg_addr, uint8_t **data, size_t data_size) {
+void write_burst_reg(cc1101_t *cc1101, uint8_t start_reg_addr, uint8_t **data, size_t data_size) {
 
     uint8_t header_byte;
     header_byte = start_reg_addr | WRITE_BURST;
@@ -106,7 +107,7 @@ void write_burst_reg(CC1101 *cc1101, uint8_t start_reg_addr, uint8_t **data, siz
 }
 
 
-void read_reg(CC1101 *cc1101, uint8_t reg_addr, uint8_t *output_buffer) {
+void read_reg(cc1101_t *cc1101, uint8_t reg_addr, uint8_t *output_buffer) {
     
     uint8_t header_byte = reg_addr | READ_SINGLE;
     gpio_put(cc1101->cs_pin, 0);
@@ -118,7 +119,7 @@ void read_reg(CC1101 *cc1101, uint8_t reg_addr, uint8_t *output_buffer) {
 }
 
 
-void read_burst_reg(CC1101 *cc1101, uint8_t start_reg_addr, uint8_t **output_buffer, size_t data_size) {
+void read_burst_reg(cc1101_t *cc1101, uint8_t start_reg_addr, uint8_t **output_buffer, size_t data_size) {
     
     uint8_t header_byte;
     uint8_t current_reg_addr = start_reg_addr;
@@ -138,15 +139,16 @@ void read_burst_reg(CC1101 *cc1101, uint8_t start_reg_addr, uint8_t **output_buf
 }
 
 
-void print_part_num(CC1101 *cc1101) {
+void print_part_num(cc1101_t *cc1101) {
     uint8_t cc1101_part_num[10] = {'a'};
     read_reg(cc1101, PARTNUM_ADDR, cc1101_part_num);
-    printf("CC1101 part number is: %s\n", cc1101_part_num);
+    printf("cc1101_t part number is: %s\n", cc1101_part_num);
 }
 
-void calculate_frequency()
+void calculate_frequency() {
+}
 
 
-void set_frequency(CC1101 *cc1101, uint8_t frequency) {
+void set_frequency(cc1101_t *cc1101, uint8_t frequency) {
     
 }
